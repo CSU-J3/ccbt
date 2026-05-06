@@ -3,38 +3,39 @@ export const TOPIC_COLORS: Record<string, string> = {
   financial_services: "#a78bfa",
   taxes: "#a78bfa",
   budget: "#a78bfa",
-  trade: "#a78bfa",
   consumer_protection: "#a78bfa",
+  licensing: "#a78bfa",
 
   // Tech — cyan
   technology: "#22d3ee",
 
-  // Defense / foreign — teal
-  defense: "#34d399",
-  foreign_policy: "#34d399",
+  // Defense / veterans — teal
   veterans: "#34d399",
 
-  // Environment / energy / agriculture — green
+  // Environment / energy / agriculture / water — green
   environment: "#65a30d",
   energy: "#65a30d",
   agriculture: "#65a30d",
+  water: "#65a30d",
 
-  // Social / labor — pink
+  // Social / labor / cannabis — pink
   healthcare: "#f472b6",
   education: "#f472b6",
   labor: "#f472b6",
   housing: "#f472b6",
-  social_security: "#f472b6",
+  cannabis: "#f472b6",
 
   // Justice / civil — red-pink
   civil_rights: "#fb7185",
   criminal_justice: "#fb7185",
   immigration: "#fb7185",
   elections: "#fb7185",
+  public_safety: "#fb7185",
 
   // Infrastructure / ops — amber
   transportation: "#f59e0b",
   government_operations: "#f59e0b",
+  municipal_affairs: "#f59e0b",
 
   // Catchall
   other: "#6b7280",
@@ -44,7 +45,6 @@ export const TOPIC_LABELS: Record<string, string> = {
   healthcare: "HLTH",
   immigration: "IMM",
   taxes: "TAX",
-  defense: "DEF",
   energy: "ENRG",
   environment: "ENV",
   education: "EDU",
@@ -53,17 +53,19 @@ export const TOPIC_LABELS: Record<string, string> = {
   civil_rights: "CIV",
   criminal_justice: "CRIM",
   agriculture: "AGR",
-  trade: "TRD",
   housing: "HSG",
   transportation: "TRNS",
-  foreign_policy: "FOR",
   veterans: "VET",
   elections: "ELEC",
   budget: "BDGT",
   financial_services: "FIN",
   government_operations: "GOV",
   consumer_protection: "CONS",
-  social_security: "SS",
+  public_safety: "SAFE",
+  licensing: "LIC",
+  municipal_affairs: "MUNI",
+  cannabis: "CNBS",
+  water: "WTR",
   other: "OTHR",
 };
 

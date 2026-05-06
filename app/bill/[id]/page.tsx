@@ -6,7 +6,7 @@ import { StageIndicator } from "@/components/StageIndicator";
 import { TopicTags } from "@/components/TopicTags";
 import { WatchlistToggle } from "@/components/WatchlistToggle";
 import {
-  congressGovUrl,
+  billSourceUrl,
   formatBillId,
   formatDateLong,
   parseTopics,
@@ -20,6 +20,48 @@ const labelStyle: React.CSSProperties = {
 const valueStyle: React.CSSProperties = {
   color: "var(--text-secondary)",
 };
+
+type RawAction = {
+  date?: string;
+  description?: string;
+  classification?: string[];
+};
+
+const MAJOR_CLASSIFICATIONS = new Set<string>([
+  "introduction",
+  "reading-1",
+  "reading-2",
+  "reading-3",
+  "referral-committee",
+  "passage",
+  "executive-receipt",
+  "executive-signature",
+  "executive-veto",
+  "veto-override-passage",
+  "withdrawal",
+  "failure",
+]);
+
+/**
+ * Pick the curated "major actions" view: dedupe repeated `referral-committee`
+ * entries (keep only the first chronologically), keep everything else that
+ * matches MAJOR_CLASSIFICATIONS. Returns newest-first to match the display.
+ */
+function pickMajorActions(chronological: RawAction[]): RawAction[] {
+  const out: RawAction[] = [];
+  let seenReferral = false;
+  for (const a of chronological) {
+    const cls = a.classification ?? [];
+    const matches = cls.some((c) => MAJOR_CLASSIFICATIONS.has(c));
+    if (!matches) continue;
+    if (cls.includes("referral-committee")) {
+      if (seenReferral) continue;
+      seenReferral = true;
+    }
+    out.push(a);
+  }
+  return out.reverse();
+}
 
 function Field({
   label,
@@ -47,6 +89,37 @@ function Divider() {
   );
 }
 
+function ActionList({ actions }: { actions: RawAction[] }) {
+  return (
+    <ol
+      className="space-y-1 text-[13px]"
+      style={{ color: "var(--text-secondary)" }}
+    >
+      {actions.map((a, i) => (
+        <li key={i} className="grid grid-cols-[100px_1fr] gap-x-4">
+          <span
+            className="tabular-nums"
+            style={{ color: "var(--text-dim)" }}
+          >
+            {formatDateLong(a.date)}
+          </span>
+          <span>
+            <span>{a.description ?? "—"}</span>
+            {a.classification && a.classification.length > 0 ? (
+              <span
+                className="ml-2 text-[12px] uppercase tracking-[0.5px]"
+                style={{ color: "var(--text-dim)" }}
+              >
+                ({a.classification.join(", ")})
+              </span>
+            ) : null}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default async function BillDetailPage({
   params,
 }: {
@@ -57,14 +130,20 @@ export default async function BillDetailPage({
   if (!bill) notFound();
 
   const onWatchlist = await isInWatchlist(bill.id);
-  const url = congressGovUrl(bill.congress, bill.bill_type, bill.bill_number);
+  const sourceUrl = billSourceUrl(bill, bill.raw_json);
   const topics = parseTopics(bill.topics);
+
+  let raw: { actions?: RawAction[] } | null = null;
   let formattedRaw = bill.raw_json;
   try {
-    formattedRaw = JSON.stringify(JSON.parse(bill.raw_json), null, 2);
+    raw = JSON.parse(bill.raw_json);
+    formattedRaw = JSON.stringify(raw, null, 2);
   } catch {
     // leave raw on parse failure
   }
+  const actionsAll = (raw?.actions ?? []).slice().reverse();
+  const actionsMajor = pickMajorActions(raw?.actions ?? []);
+  const useFiltered = actionsAll.length >= 4 && actionsMajor.length < actionsAll.length;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -85,7 +164,7 @@ export default async function BillDetailPage({
                   className="text-[16px] font-medium"
                   style={{ color: "var(--accent-amber)" }}
                 >
-                  {formatBillId(bill.bill_type, bill.bill_number)}
+                  {formatBillId(bill)}
                 </span>
                 <h1
                   className="text-[15px]"
@@ -106,7 +185,7 @@ export default async function BillDetailPage({
                 </span>{" "}
                 <PartyTag
                   party={bill.sponsor_party}
-                  state={bill.sponsor_state}
+                  district={bill.sponsor_district}
                 />
               </Field>
             ) : null}
@@ -168,11 +247,39 @@ export default async function BillDetailPage({
             </>
           ) : null}
 
+          {actionsAll.length > 0 ? (
+            <>
+              <Divider />
+              <div
+                className="mb-2 text-[12px] uppercase tracking-[0.5px]"
+                style={labelStyle}
+              >
+                Action history ({actionsAll.length})
+              </div>
+              <ActionList
+                actions={useFiltered ? actionsMajor : actionsAll}
+              />
+              {useFiltered ? (
+                <details className="mt-3">
+                  <summary
+                    className="cursor-pointer select-none text-[12px] uppercase tracking-[0.5px]"
+                    style={{ color: "var(--text-dim)" }}
+                  >
+                    Show all {actionsAll.length} actions
+                  </summary>
+                  <div className="mt-2">
+                    <ActionList actions={actionsAll} />
+                  </div>
+                </details>
+              ) : null}
+            </>
+          ) : null}
+
           <Divider />
 
           <div className="flex flex-wrap items-center gap-2">
             <a
-              href={url}
+              href={sourceUrl}
               target="_blank"
               rel="noreferrer"
               className="border px-2.5 py-1 text-[12px] font-medium uppercase tracking-[0.5px] transition hover:border-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
@@ -181,7 +288,7 @@ export default async function BillDetailPage({
                 borderColor: "var(--border-strong)",
               }}
             >
-              Congress.gov ↗
+              Official source ↗
             </a>
             <a
               href="/"

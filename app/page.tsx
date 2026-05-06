@@ -18,7 +18,6 @@ type SearchParams = {
   stage?: string;
   expanded?: string;
   q?: string;
-  sponsor?: string;
   sort?: string;
 };
 
@@ -30,20 +29,18 @@ export default async function FeedPage({
   const params = await searchParams;
   const topics = sanitizeTopics(params.topics);
   const stage = sanitizeStage(params.stage);
-  const expandedParam = typeof params.expanded === "string" ? params.expanded : undefined;
+  const expandedParam =
+    typeof params.expanded === "string" ? params.expanded : undefined;
   const q = typeof params.q === "string" ? params.q.trim() : "";
-  const sponsor =
-    typeof params.sponsor === "string" && params.sponsor.trim()
-      ? params.sponsor.trim()
-      : undefined;
   const sort = sanitizeSort(params.sort);
-  const hasFilters = topics.length > 0 || !!stage || !!sponsor;
-  const feedFilters = { topics, stage, q: q || undefined, sponsor, sort };
+  const hasFilters = topics.length > 0 || !!stage;
+  const feedFilters = { topics, stage, q: q || undefined, sort };
 
-  const bills = await getFeedBills(feedFilters, 50);
-  const expandedId = expandedParam && bills.some((b) => b.id === expandedParam)
-    ? expandedParam
-    : undefined;
+  const bills = await getFeedBills(feedFilters, 100);
+  const expandedId =
+    expandedParam && bills.some((b) => b.id === expandedParam)
+      ? expandedParam
+      : undefined;
   const onWatchlist = expandedId ? await isInWatchlist(expandedId) : false;
 
   const clearSearchParams = new URLSearchParams();
@@ -72,7 +69,6 @@ export default async function FeedPage({
             current={stage}
             topics={topics}
             q={q}
-            sponsor={sponsor}
             sort={sort}
           />
           <span
@@ -85,7 +81,6 @@ export default async function FeedPage({
             selected={topics}
             stage={stage}
             q={q}
-            sponsor={sponsor}
             sort={sort}
           />
           <span
@@ -159,7 +154,7 @@ export default async function FeedPage({
                 <BillRow
                   key={b.id}
                   bill={b}
-                  filters={{ topics, stage, q, sponsor, sort }}
+                  filters={{ topics, stage, q, sort }}
                   basePath="/"
                   expandedId={expandedId}
                   onWatchlist={expandedId === b.id ? onWatchlist : false}

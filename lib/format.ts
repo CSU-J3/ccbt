@@ -1,25 +1,68 @@
-const BILL_TYPE_FULL: Record<string, string> = {
-  hr: "house-bill",
-  s: "senate-bill",
-  hres: "house-resolution",
-  sres: "senate-resolution",
-  hjres: "house-joint-resolution",
-  sjres: "senate-joint-resolution",
-  hconres: "house-concurrent-resolution",
-  sconres: "senate-concurrent-resolution",
-};
-
-export function formatBillId(billType: string, billNumber: number): string {
-  return `${billType.toUpperCase()} ${billNumber}`;
+function sessionYearTwoDigit(session: string): string {
+  const m = session.match(/^(\d{4})/);
+  if (!m) return "";
+  return m[1]!.slice(2);
 }
 
-export function congressGovUrl(
-  congress: number,
-  billType: string,
-  billNumber: number,
+export function formatBillId(row: {
+  bill_type: string;
+  bill_number: number;
+  session: string;
+}): string {
+  const yy = sessionYearTwoDigit(row.session);
+  return yy
+    ? `${row.bill_type.toUpperCase()} ${yy}-${row.bill_number}`
+    : `${row.bill_type.toUpperCase()} ${row.bill_number}`;
+}
+
+export function formatSponsor(row: {
+  sponsor_name: string | null;
+  sponsor_party: string | null;
+  sponsor_district: string | null;
+}): string {
+  if (!row.sponsor_name) return "";
+  const name = lastNamePart(row.sponsor_name);
+  if (!row.sponsor_party && !row.sponsor_district) return name;
+  if (row.sponsor_party && row.sponsor_district) {
+    return `${name} (${row.sponsor_party}, ${row.sponsor_district})`;
+  }
+  return `${name} (${row.sponsor_party ?? row.sponsor_district})`;
+}
+
+function lastNamePart(name: string): string {
+  const noPrefix = name.replace(/^(Rep\.|Sen\.|Del\.|Res\.)\s*/i, "").trim();
+  const lastName = noPrefix.split(",")[0]?.trim();
+  return lastName ?? noPrefix;
+}
+
+export function openStatesUrl(row: {
+  jurisdiction: string;
+  session: string;
+  bill_type: string;
+  bill_number: number;
+}): string {
+  return `https://openstates.org/${row.jurisdiction.toLowerCase()}/bills/${row.session}/${row.bill_type.toUpperCase()}${row.bill_number}/`;
+}
+
+export function billSourceUrl(
+  row: {
+    jurisdiction: string;
+    session: string;
+    bill_type: string;
+    bill_number: number;
+  },
+  rawJson: string,
 ): string {
-  const slug = BILL_TYPE_FULL[billType] ?? billType;
-  return `https://www.congress.gov/bill/${congress}th-congress/${slug}/${billNumber}`;
+  try {
+    const raw = JSON.parse(rawJson) as {
+      sources?: Array<{ url?: string }>;
+    };
+    const first = raw.sources?.[0]?.url;
+    if (first && typeof first === "string") return first;
+  } catch {
+    // fall through
+  }
+  return openStatesUrl(row);
 }
 
 // "MM-DD-YY" — feed list, dense
@@ -75,4 +118,3 @@ export function parseTopics(json: string | null | undefined): string[] {
     return [];
   }
 }
-

@@ -40,13 +40,21 @@ export function FooterLegend() {
         <div className="flex flex-wrap items-center gap-2">
           <span style={{ color: "var(--stage-introduced)" }}>▸ INTRO</span>
           <span style={{ color: "var(--text-dim)" }}>·</span>
-          <span style={{ color: "var(--stage-committee)" }}>▸ COMMITTEE</span>
+          <span style={{ color: "var(--stage-in-committee)" }}>▸ COMMITTEE</span>
           <span style={{ color: "var(--text-dim)" }}>·</span>
-          <span style={{ color: "var(--stage-floor)" }}>▸▸ FLOOR</span>
+          <span style={{ color: "var(--stage-passed-first-chamber)" }}>
+            ▸▸ PASSED 1ST
+          </span>
           <span style={{ color: "var(--text-dim)" }}>·</span>
-          <span style={{ color: "var(--stage-other-chamber)" }}>▸▸▸ OTHER CHAMBER</span>
+          <span style={{ color: "var(--stage-passed-second-chamber)" }}>
+            ▸▸▸ PASSED BOTH
+          </span>
           <span style={{ color: "var(--text-dim)" }}>·</span>
-          <span style={{ color: "var(--stage-president)" }}>▸▸▸▸ PRESIDENT</span>
+          <span style={{ color: "var(--stage-signed)" }}>✓ SIGNED</span>
+          <span style={{ color: "var(--text-dim)" }}>·</span>
+          <span style={{ color: "var(--stage-vetoed)" }}>✗ VETOED</span>
+          <span style={{ color: "var(--text-dim)" }}>·</span>
+          <span style={{ color: "var(--stage-dead)" }}>— DEAD</span>
         </div>
       </div>
     </footer>

@@ -6,17 +6,18 @@ import { ALLOWED_STAGES, type Stage } from "@/lib/enums";
 
 const STAGE_LABEL: Record<string, string> = {
   introduced: "INTRODUCED",
-  committee: "COMMITTEE",
-  floor: "FLOOR",
-  other_chamber: "OTHER CHAMBER",
-  president: "PRESIDENT",
+  in_committee: "IN COMMITTEE",
+  passed_first_chamber: "PASSED 1ST CHAMBER",
+  passed_second_chamber: "PASSED BOTH CHAMBERS",
+  signed: "SIGNED",
+  vetoed: "VETOED",
+  dead: "DEAD",
 };
 
 export function StageFilter({
   current,
   topics,
   q,
-  sponsor,
   sort,
   basePath = "/",
   availableStages = ALLOWED_STAGES,
@@ -24,7 +25,6 @@ export function StageFilter({
   current: string | undefined;
   topics: string[];
   q?: string;
-  sponsor?: string;
   sort?: string;
   basePath?: string;
   availableStages?: readonly Stage[];
@@ -37,7 +37,6 @@ export function StageFilter({
     if (topics.length > 0) params.set("topics", topics.join(","));
     if (value) params.set("stage", value);
     if (q) params.set("q", q);
-    if (sponsor) params.set("sponsor", sponsor);
     if (sort && sort !== "action") params.set("sort", sort);
     const qs = params.toString();
     startTransition(() => {

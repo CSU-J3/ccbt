@@ -1,5 +1,5 @@
 import { WatchlistToggle } from "@/components/WatchlistToggle";
-import { congressGovUrl, formatDateLong } from "@/lib/format";
+import { formatDateLong, openStatesUrl } from "@/lib/format";
 import type { FeedBill } from "@/lib/queries";
 
 const labelStyle: React.CSSProperties = {
@@ -16,7 +16,7 @@ export function ExpandedPanel({
   onWatchlist: boolean;
   introducedDate: string | null;
 }) {
-  const url = congressGovUrl(bill.congress, bill.bill_type, bill.bill_number);
+  const url = openStatesUrl(bill);
   return (
     <div className="expanded-panel">
       <dl className="grid grid-cols-[124px_1fr] gap-y-1.5 text-[13px]">
@@ -91,7 +91,7 @@ export function ExpandedPanel({
             borderColor: "var(--border-strong)",
           }}
         >
-          Congress.gov ↗
+          OpenStates ↗
         </a>
       </div>
     </div>

@@ -5,7 +5,6 @@ function partyColor(party: string | null): string {
     case "D":
       return "var(--party-democrat)";
     case "I":
-    case "ID":
       return "var(--party-independent)";
     default:
       return "var(--text-dim)";
@@ -14,14 +13,14 @@ function partyColor(party: string | null): string {
 
 export function PartyTag({
   party,
-  state,
+  district,
 }: {
   party: string | null;
-  state: string | null;
+  district: string | null;
 }) {
-  if (!party && !state) return null;
-  const text = `[${party ?? "?"}-${state ?? "?"}]`;
+  if (!party && !district) return null;
+  const inner = [party, district].filter(Boolean).join(", ");
   return (
-    <span style={{ color: partyColor(party) }}>{text}</span>
+    <span style={{ color: partyColor(party) }}>({inner})</span>
   );
 }

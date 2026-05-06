@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CBT — Congress Bill Terminal",
+  title: "CCBT — Colorado Capitol Bill Terminal",
   description:
-    "Personal feed of recent US Congress bills with plain-English summaries.",
+    "Personal feed of recent Colorado state bills with plain-English summaries.",
 };
 
 export const viewport: Viewport = {

@@ -44,6 +44,12 @@ export type SummarizeResult = {
 
 export type SummarizeOutput = {
   result: SummarizeResult | null;
+  /**
+   * The raw stage string the LLM emitted, before validation/fallback.
+   * Used by the runner to distinguish in-enum disagreements from
+   * out-of-enum fallbacks.
+   */
+  llmStageRaw: string | null;
   promptTokens: number;
   outputTokens: number;
 };
@@ -168,12 +174,17 @@ Official abstract (if any): ${bill.abstract_text ?? ABSTRACT_FALLBACK}`;
   const outputTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
 
   const text = response.text;
-  if (!text) return { result: null, promptTokens, outputTokens };
+  if (!text) {
+    return { result: null, llmStageRaw: null, promptTokens, outputTokens };
+  }
   const parsed = parseResponse(text);
-  if (!parsed) return { result: null, promptTokens, outputTokens };
+  if (!parsed) {
+    return { result: null, llmStageRaw: null, promptTokens, outputTokens };
+  }
 
   return {
     result: validateResult(parsed, bill.id),
+    llmStageRaw: parsed.stage,
     promptTokens,
     outputTokens,
   };

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { getDb } from "./db";
+import { ALLOWED_STAGES_SET } from "./enums";
 import {
   pickAbstract,
   summarizeBill,
@@ -17,7 +18,10 @@ export type SummarizeStats = {
   failed: number;
   abstractsPresent: number;
   abstractsFallback: number;
-  stageDisagreements: number;
+  /** Bills where the LLM emitted a valid in-enum stage that differed from the deterministic stage. */
+  inEnumStageDivergences: number;
+  /** Bills where the LLM emitted an out-of-enum stage string (e.g. "sent_to_governor"). */
+  unparseableLlmStages: number;
   promptTokens: number;
   outputTokens: number;
   samples: Array<{ bill: BillRow; result: SummarizeResult }>;
@@ -96,7 +100,8 @@ export async function runSummarize(
     failed: 0,
     abstractsPresent: 0,
     abstractsFallback: 0,
-    stageDisagreements: 0,
+    inEnumStageDivergences: 0,
+    unparseableLlmStages: 0,
     promptTokens: 0,
     outputTokens: 0,
     samples: [],
@@ -119,13 +124,17 @@ export async function runSummarize(
             console.warn(`parse-fail: ${c.bill.id}`);
             return { c, result: null };
           }
-          if (
+          const rawStage = out.llmStageRaw;
+          if (rawStage && !ALLOWED_STAGES_SET.has(rawStage)) {
+            stats.unparseableLlmStages++;
+          } else if (
+            rawStage &&
             c.deterministicStage &&
-            out.result.stage !== c.deterministicStage
+            rawStage !== c.deterministicStage
           ) {
-            stats.stageDisagreements++;
+            stats.inEnumStageDivergences++;
             console.warn(
-              `stage-disagree ${c.bill.id}: llm="${out.result.stage}" deterministic="${c.deterministicStage}"`,
+              `stage-disagree ${c.bill.id}: llm="${rawStage}" deterministic="${c.deterministicStage}"`,
             );
           }
           await db.execute({
@@ -167,8 +176,13 @@ export async function runSummarize(
     }
   }
 
+  const total = candidates.length || 1;
+  const pct = (n: number) => ((n / total) * 100).toFixed(1);
   console.log(
-    `summarized=${stats.ok} failed=${stats.failed} abstract_present=${stats.abstractsPresent} abstract_fallback=${stats.abstractsFallback} stage_disagree=${stats.stageDisagreements}`,
+    `${stats.ok} summarized, ${stats.failed} failed
+abstract coverage: ${stats.abstractsPresent}/${candidates.length} (${pct(stats.abstractsPresent)}%)
+in-enum stage divergences: ${stats.inEnumStageDivergences}/${candidates.length} (${pct(stats.inEnumStageDivergences)}%)
+unparseable LLM stage: ${stats.unparseableLlmStages}/${candidates.length} (${pct(stats.unparseableLlmStages)}%)`,
   );
   return stats;
 }

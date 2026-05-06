@@ -33,7 +33,6 @@ Next.js 15 (App Router) · TypeScript · Tailwind v4 · Turso (libSQL) ·
 4. `npm run sync` to fetch Colorado bills from OpenStates (~700 bills per
    regular session; incremental on subsequent runs)
 5. `npm run summarize` to generate plain-English summaries with Gemini
-   *(deferred — replaced in a later handoff with state-bill-aware prompts)*
 6. `npm run dev` — dashboard at http://localhost:3000
 
 ## Deployment
@@ -42,6 +41,10 @@ Deployed via `vercel --prod`. A daily Vercel Cron at 09:00 UTC (`vercel.json`)
 hits `/api/sync` with a `Bearer ${CRON_SECRET}` header; the route runs sync
 first, then summarizes any new NULL-summary rows (capped at 50/tick to fit the
 Hobby 60-second function ceiling).
+
+When the Colorado legislative session rolls over (currently `2025A`; next is
+`2025B` for special session or `2026A` for next regular session), update the
+`CO_CURRENT_SESSION` env var in Vercel and locally. No code change required.
 
 ## Project structure
 

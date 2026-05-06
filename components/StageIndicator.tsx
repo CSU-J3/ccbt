@@ -1,33 +1,41 @@
 const STAGE_PREFIX: Record<string, string> = {
   introduced: "▸",
-  committee: "▸",
-  floor: "▸▸",
-  other_chamber: "▸▸▸",
-  president: "▸▸▸▸",
+  in_committee: "▸",
+  passed_first_chamber: "▸▸",
+  passed_second_chamber: "▸▸▸",
+  signed: "✓",
+  vetoed: "✗",
+  dead: "—",
 };
 
 const STAGE_LABEL: Record<string, string> = {
   introduced: "INTRO",
-  committee: "COMMITTEE",
-  floor: "FLOOR",
-  other_chamber: "OTHER CHAMBER",
-  president: "PRESIDENT",
+  in_committee: "COMMITTEE",
+  passed_first_chamber: "PASSED 1ST",
+  passed_second_chamber: "PASSED BOTH",
+  signed: "SIGNED",
+  vetoed: "VETOED",
+  dead: "DEAD",
 };
 
 const STAGE_LABEL_SHORT: Record<string, string> = {
   introduced: "INTRO",
-  committee: "COMM",
-  floor: "FLR",
-  other_chamber: "OCHM",
-  president: "PRES",
+  in_committee: "COMM",
+  passed_first_chamber: "P-1ST",
+  passed_second_chamber: "P-BOTH",
+  signed: "SIGN",
+  vetoed: "VETO",
+  dead: "DEAD",
 };
 
 const STAGE_COLOR: Record<string, string> = {
   introduced: "var(--stage-introduced)",
-  committee: "var(--stage-committee)",
-  floor: "var(--stage-floor)",
-  other_chamber: "var(--stage-other-chamber)",
-  president: "var(--stage-president)",
+  in_committee: "var(--stage-in-committee)",
+  passed_first_chamber: "var(--stage-passed-first-chamber)",
+  passed_second_chamber: "var(--stage-passed-second-chamber)",
+  signed: "var(--stage-signed)",
+  vetoed: "var(--stage-vetoed)",
+  dead: "var(--stage-dead)",
 };
 
 export function StageIndicator({
