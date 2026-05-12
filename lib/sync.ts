@@ -84,7 +84,7 @@ function normalizeParty(raw: string | null | undefined): string | null {
 
 function parseIdentifier(identifier: string): { type: string; number: number } | null {
   const trimmed = identifier.trim();
-  const match = trimmed.match(/^([A-Z]+)\s+\d{2}-(\d+)$/);
+  const match = trimmed.match(/^([A-Z]+)\s+(?:\d{2}-)?(\d+)$/);
   if (!match) return null;
   const [, type, number] = match;
   if (!type || !number) return null;
