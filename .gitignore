@@ -30,3 +30,4 @@ cbt-*.png
 # claude code per-developer state (skills/ stays tracked)
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
+.vercel

@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { FooterLegend } from "@/components/FooterLegend";
 import { HeaderBar } from "@/components/HeaderBar";
 import { PartyTag } from "@/components/PartyTag";
 import { StageIndicator } from "@/components/StageIndicator";
@@ -339,8 +338,6 @@ export default async function BillDetailPage({
           ) : null}
         </div>
       </main>
-
-      <FooterLegend />
     </div>
   );
 }

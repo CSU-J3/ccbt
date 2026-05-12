@@ -15,6 +15,7 @@ const statements = [
     sponsor_name TEXT,
     sponsor_party TEXT,
     sponsor_district TEXT,
+    sponsor_id TEXT,
     update_date TEXT NOT NULL,
     openstates_id TEXT NOT NULL,
     raw_json TEXT NOT NULL,
@@ -27,6 +28,7 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS idx_bills_update_date ON bills(update_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_bills_latest_action ON bills(latest_action_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_bills_jurisdiction_session ON bills(jurisdiction, session)`,
+  `CREATE INDEX IF NOT EXISTS idx_bills_sponsor_id ON bills(sponsor_id)`,
   `CREATE TABLE IF NOT EXISTS watchlist (
     bill_id TEXT PRIMARY KEY REFERENCES bills(id),
     added_at TEXT NOT NULL,
@@ -34,12 +36,31 @@ const statements = [
   )`,
 ];
 
+async function columnExists(
+  db: ReturnType<typeof getDb>,
+  table: string,
+  column: string,
+): Promise<boolean> {
+  const r = await db.execute(`PRAGMA table_info(${table})`);
+  return r.rows.some((row) => row.name === column);
+}
+
 async function main() {
   const db = getDb();
   for (const sql of statements) {
     await db.execute(sql);
     console.log("ok:", sql.split("\n")[0]);
   }
+
+  if (!(await columnExists(db, "bills", "sponsor_id"))) {
+    await db.execute(`ALTER TABLE bills ADD COLUMN sponsor_id TEXT`);
+    console.log("ok: ALTER TABLE bills ADD COLUMN sponsor_id");
+    await db.execute(
+      `CREATE INDEX IF NOT EXISTS idx_bills_sponsor_id ON bills(sponsor_id)`,
+    );
+    console.log("ok: idx_bills_sponsor_id (post-alter)");
+  }
+
   console.log("migration complete");
 }
 

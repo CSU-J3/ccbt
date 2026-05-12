@@ -15,6 +15,9 @@ export type BillRowFilters = {
   stage: string | undefined;
   q?: string;
   sort?: string;
+  chamber?: string;
+  page?: number;
+  sponsor?: string;
 };
 
 function shortSponsor(name: string | null): string {
@@ -48,6 +51,9 @@ export function BillRow({
   if (filters.q) params.set("q", filters.q);
   if (filters.sort && filters.sort !== "action")
     params.set("sort", filters.sort);
+  if (filters.chamber) params.set("chamber", filters.chamber);
+  if (filters.sponsor) params.set("sponsor", filters.sponsor);
+  if (filters.page && filters.page > 1) params.set("page", String(filters.page));
   if (!isExpanded) params.set("expanded", bill.id);
   const qs = params.toString();
   const href = qs ? `${basePath}?${qs}` : basePath;
@@ -72,12 +78,12 @@ export function BillRow({
           {isExpanded ? "▾" : "▸"}
         </span>
         <span
-          className="text-[14px] font-medium"
+          className="text-[15px] font-medium"
           style={{ color: "var(--accent-amber)" }}
         >
           {formatBillId(bill)}
         </span>
-        <span className="min-w-0 truncate text-[14px]">
+        <span className="min-w-0 truncate text-[15px]">
           <span style={{ color: "var(--text-primary)" }}>{bill.title}</span>
           {bill.sponsor_name ? (
             <>
@@ -88,10 +94,12 @@ export function BillRow({
               {bill.sponsor_party || bill.sponsor_district ? (
                 <>
                   {" "}
-                  <PartyTag
-                    party={bill.sponsor_party}
-                    district={bill.sponsor_district}
-                  />
+                  <span className="inline-block shrink-0 align-baseline">
+                    <PartyTag
+                      party={bill.sponsor_party}
+                      district={bill.sponsor_district}
+                    />
+                  </span>
                 </>
               ) : null}
             </>
@@ -101,7 +109,7 @@ export function BillRow({
           <StageIndicator stage={bill.stage} responsive />
         </span>
         <span
-          className="col-date text-[13px]"
+          className="col-date text-[14px]"
           style={{ color: "var(--text-dim)" }}
         >
           {formatDateShort(bill.latest_action_date)}

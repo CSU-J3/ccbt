@@ -19,6 +19,7 @@ export type FeedBill = {
   sponsor_name: string | null;
   sponsor_party: string | null;
   sponsor_district: string | null;
+  sponsor_id: string | null;
   introduced_date: string | null;
   latest_action_date: string | null;
   latest_action_text: string | null;
@@ -38,15 +39,24 @@ export const SORT_KEYS = ["action", "introduced"] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 const SORT_KEYS_SET = new Set<string>(SORT_KEYS);
 
+export const CHAMBER_KEYS = ["house", "senate"] as const;
+export type ChamberKey = (typeof CHAMBER_KEYS)[number];
+const CHAMBER_KEYS_SET = new Set<string>(CHAMBER_KEYS);
+
+const HOUSE_BILL_TYPES = ["HB", "HJR", "HCR", "HM"];
+const SENATE_BILL_TYPES = ["SB", "SJR", "SCR", "SM"];
+
 export type FeedFilters = {
   topics?: string[];
   stage?: string;
   q?: string;
   sort?: SortKey;
+  chamber?: ChamberKey;
+  sponsor?: string;
 };
 
 const FEED_COLUMNS = `id, jurisdiction, session, bill_type, bill_number, title,
-  sponsor_name, sponsor_party, sponsor_district,
+  sponsor_name, sponsor_party, sponsor_district, sponsor_id,
   introduced_date, latest_action_date, latest_action_text,
   update_date, summary, topics, stage`;
 
@@ -54,15 +64,25 @@ function buildFeedWhere(filters: FeedFilters): {
   clauses: string[];
   args: (string | number)[];
 } {
-  const clauses: string[] = [
-    "jurisdiction = ?",
-    "session = ?",
-  ];
+  const clauses: string[] = ["jurisdiction = ?", "session = ?"];
   const args: (string | number)[] = [JURISDICTION, getCurrentSession()];
 
   if (filters.stage) {
     clauses.push("stage = ?");
     args.push(filters.stage);
+  }
+
+  if (filters.chamber) {
+    const types =
+      filters.chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
+    const placeholders = types.map(() => "?").join(", ");
+    clauses.push(`UPPER(bill_type) IN (${placeholders})`);
+    for (const t of types) args.push(t);
+  }
+
+  if (filters.sponsor) {
+    clauses.push("sponsor_id = ?");
+    args.push(filters.sponsor);
   }
 
   if (filters.topics && filters.topics.length > 0) {
@@ -101,6 +121,20 @@ export function sanitizeStage(input: string | undefined): string | undefined {
 export function sanitizeSort(raw: string | null | undefined): SortKey {
   if (raw && SORT_KEYS_SET.has(raw)) return raw as SortKey;
   return "action";
+}
+
+export function sanitizeChamber(
+  raw: string | null | undefined,
+): ChamberKey | undefined {
+  if (raw && CHAMBER_KEYS_SET.has(raw)) return raw as ChamberKey;
+  return undefined;
+}
+
+export function sanitizePage(raw: string | null | undefined): number {
+  if (!raw) return 1;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return n;
 }
 
 export type FeedStats = {
@@ -154,6 +188,7 @@ function rowToFeedBill(r: Record<string, unknown>): FeedBill {
     sponsor_name: (r.sponsor_name as string | null) ?? null,
     sponsor_party: (r.sponsor_party as string | null) ?? null,
     sponsor_district: (r.sponsor_district as string | null) ?? null,
+    sponsor_id: (r.sponsor_id as string | null) ?? null,
     introduced_date: (r.introduced_date as string | null) ?? null,
     latest_action_date: (r.latest_action_date as string | null) ?? null,
     latest_action_text: (r.latest_action_text as string | null) ?? null,
@@ -167,10 +202,12 @@ function rowToFeedBill(r: Record<string, unknown>): FeedBill {
 export async function getFeedBills(
   filters: FeedFilters,
   limit = 100,
+  offset = 0,
 ): Promise<FeedBill[]> {
   const db = getDb();
   const { clauses, args } = buildFeedWhere(filters);
   args.push(limit);
+  args.push(offset);
 
   const sortColumn =
     filters.sort === "introduced" ? "introduced_date" : "latest_action_date";
@@ -179,7 +216,7 @@ export async function getFeedBills(
     FROM bills
     WHERE ${clauses.join(" AND ")}
     ORDER BY ${sortColumn} DESC NULLS LAST, id DESC
-    LIMIT ?`;
+    LIMIT ? OFFSET ?`;
 
   const rs = await db.execute({ sql, args });
   return rs.rows.map(rowToFeedBill);
@@ -204,22 +241,30 @@ export async function getBillById(id: string): Promise<BillDetail | null> {
 
 export async function getWatchlistBills(
   sort: SortKey = "action",
+  chamber?: ChamberKey,
 ): Promise<FeedBill[]> {
   const db = getDb();
   const sortColumn =
     sort === "introduced" ? "b.introduced_date" : "b.latest_action_date";
+
+  const args: (string | number)[] = [JURISDICTION, getCurrentSession()];
+  let chamberClause = "";
+  if (chamber) {
+    const types = chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
+    const placeholders = types.map(() => "?").join(", ");
+    chamberClause = ` AND UPPER(b.bill_type) IN (${placeholders})`;
+    for (const t of types) args.push(t);
+  }
+
   const sql = `SELECT b.id, b.jurisdiction, b.session, b.bill_type, b.bill_number, b.title,
-      b.sponsor_name, b.sponsor_party, b.sponsor_district,
+      b.sponsor_name, b.sponsor_party, b.sponsor_district, b.sponsor_id,
       b.introduced_date, b.latest_action_date, b.latest_action_text,
       b.update_date, b.summary, b.topics, b.stage
     FROM bills b
     INNER JOIN watchlist w ON w.bill_id = b.id
-    WHERE b.jurisdiction = ? AND b.session = ?
+    WHERE b.jurisdiction = ? AND b.session = ?${chamberClause}
     ORDER BY ${sortColumn} DESC NULLS LAST, b.id DESC`;
-  const rs = await db.execute({
-    sql,
-    args: [JURISDICTION, getCurrentSession()],
-  });
+  const rs = await db.execute({ sql, args });
   return rs.rows.map(rowToFeedBill);
 }
 
@@ -246,4 +291,168 @@ export async function removeFromWatchlist(billId: string): Promise<void> {
     sql: "DELETE FROM watchlist WHERE bill_id = ?",
     args: [billId],
   });
+}
+
+// ----- sponsor aggregation -----------------------------------------------
+
+export const SPONSOR_SORT_KEYS = ["volume", "passrate"] as const;
+export type SponsorSortKey = (typeof SPONSOR_SORT_KEYS)[number];
+const SPONSOR_SORT_KEYS_SET = new Set<string>(SPONSOR_SORT_KEYS);
+
+export function sanitizeSponsorSort(
+  raw: string | null | undefined,
+): SponsorSortKey {
+  if (raw && SPONSOR_SORT_KEYS_SET.has(raw)) return raw as SponsorSortKey;
+  return "volume";
+}
+
+export type SponsorAggregate = {
+  sponsor_id: string;
+  sponsor_name: string | null;
+  sponsor_party: string | null;
+  sponsor_district: string | null;
+  total: number;
+  signed_count: number;
+  passrate: number;
+};
+
+export async function getSponsorAggregates(
+  sort: SponsorSortKey,
+  chamber: ChamberKey | undefined,
+  limit = 100,
+): Promise<SponsorAggregate[]> {
+  const db = getDb();
+
+  const clauses: string[] = [
+    "jurisdiction = ?",
+    "session = ?",
+    "sponsor_id IS NOT NULL",
+  ];
+  const args: (string | number)[] = [JURISDICTION, getCurrentSession()];
+
+  if (chamber) {
+    const types = chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
+    const placeholders = types.map(() => "?").join(", ");
+    clauses.push(`UPPER(bill_type) IN (${placeholders})`);
+    for (const t of types) args.push(t);
+  }
+
+  const orderBy =
+    sort === "passrate"
+      ? "passrate DESC, total DESC"
+      : "total DESC, passrate DESC";
+
+  const sql = `SELECT
+      sponsor_id,
+      MAX(sponsor_name) AS sponsor_name,
+      MAX(sponsor_party) AS sponsor_party,
+      MAX(sponsor_district) AS sponsor_district,
+      COUNT(*) AS total,
+      SUM(CASE WHEN stage = 'signed' THEN 1 ELSE 0 END) AS signed_count,
+      CAST(SUM(CASE WHEN stage = 'signed' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS passrate
+    FROM bills
+    WHERE ${clauses.join(" AND ")}
+    GROUP BY sponsor_id
+    ORDER BY ${orderBy}
+    LIMIT ?`;
+  args.push(limit);
+
+  const rs = await db.execute({ sql, args });
+  return rs.rows.map((r) => ({
+    sponsor_id: r.sponsor_id as string,
+    sponsor_name: (r.sponsor_name as string | null) ?? null,
+    sponsor_party: (r.sponsor_party as string | null) ?? null,
+    sponsor_district: (r.sponsor_district as string | null) ?? null,
+    total: Number(r.total ?? 0),
+    signed_count: Number(r.signed_count ?? 0),
+    passrate: Number(r.passrate ?? 0),
+  }));
+}
+
+export type SponsorStageBreakdown = Record<string, number>;
+export type SponsorTopicCount = { topic: string; count: number };
+
+export type SponsorDetail = {
+  sponsor_id: string;
+  sponsor_name: string | null;
+  sponsor_party: string | null;
+  sponsor_district: string | null;
+  total: number;
+  signed_count: number;
+  passrate: number;
+  stages: SponsorStageBreakdown;
+  topics: SponsorTopicCount[];
+  bills: FeedBill[];
+};
+
+export async function getSponsorDetail(
+  sponsorId: string,
+  chamber: ChamberKey | undefined,
+): Promise<SponsorDetail | null> {
+  const db = getDb();
+  const args: (string | number)[] = [
+    JURISDICTION,
+    getCurrentSession(),
+    sponsorId,
+  ];
+  let chamberClause = "";
+  if (chamber) {
+    const types = chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
+    const placeholders = types.map(() => "?").join(", ");
+    chamberClause = ` AND UPPER(bill_type) IN (${placeholders})`;
+    for (const t of types) args.push(t);
+  }
+
+  const rs = await db.execute({
+    sql: `SELECT ${FEED_COLUMNS}
+      FROM bills
+      WHERE jurisdiction = ? AND session = ? AND sponsor_id = ?${chamberClause}
+      ORDER BY latest_action_date DESC NULLS LAST, id DESC`,
+    args,
+  });
+
+  const bills = rs.rows.map(rowToFeedBill);
+  if (bills.length === 0) return null;
+
+  const stages: SponsorStageBreakdown = {};
+  const topicCounts = new Map<string, number>();
+  let signed = 0;
+  for (const b of bills) {
+    if (b.stage) {
+      stages[b.stage] = (stages[b.stage] ?? 0) + 1;
+      if (b.stage === "signed") signed++;
+    }
+    if (b.topics) {
+      try {
+        const arr = JSON.parse(b.topics) as unknown;
+        if (Array.isArray(arr)) {
+          for (const t of arr) {
+            if (typeof t === "string") {
+              topicCounts.set(t, (topicCounts.get(t) ?? 0) + 1);
+            }
+          }
+        }
+      } catch {
+        // skip malformed
+      }
+    }
+  }
+
+  const topics: SponsorTopicCount[] = [...topicCounts.entries()]
+    .map(([topic, count]) => ({ topic, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const first = bills[0]!;
+  return {
+    sponsor_id: sponsorId,
+    sponsor_name: first.sponsor_name,
+    sponsor_party: first.sponsor_party,
+    sponsor_district: first.sponsor_district,
+    total: bills.length,
+    signed_count: signed,
+    passrate: bills.length > 0 ? signed / bills.length : 0,
+    stages,
+    topics,
+    bills,
+  };
 }

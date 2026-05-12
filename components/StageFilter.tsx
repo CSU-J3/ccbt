@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { ALLOWED_STAGES, type Stage } from "@/lib/enums";
 
@@ -16,28 +16,23 @@ const STAGE_LABEL: Record<string, string> = {
 
 export function StageFilter({
   current,
-  topics,
-  q,
-  sort,
   basePath = "/",
   availableStages = ALLOWED_STAGES,
 }: {
   current: string | undefined;
-  topics: string[];
-  q?: string;
-  sort?: string;
   basePath?: string;
   availableStages?: readonly Stage[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   function onChange(value: string) {
-    const params = new URLSearchParams();
-    if (topics.length > 0) params.set("topics", topics.join(","));
+    const params = new URLSearchParams(searchParams.toString());
     if (value) params.set("stage", value);
-    if (q) params.set("q", q);
-    if (sort && sort !== "action") params.set("sort", sort);
+    else params.delete("stage");
+    params.delete("expanded");
+    params.delete("page");
     const qs = params.toString();
     startTransition(() => {
       router.push(qs ? `${basePath}?${qs}` : basePath);

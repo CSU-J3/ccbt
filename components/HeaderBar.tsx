@@ -26,6 +26,7 @@ export async function HeaderBar({
     showSearch &&
     (!!q ||
       !!feedFilters?.stage ||
+      !!feedFilters?.chamber ||
       (feedFilters?.topics?.length ?? 0) > 0);
 
   return (
@@ -36,33 +37,20 @@ export async function HeaderBar({
         borderColor: "var(--border-strong)",
       }}
     >
-      <div className="header-inner flex w-full items-center gap-x-4 px-4 py-3">
-        <Link
-          href="/"
-          className="text-[16px] font-medium uppercase tracking-[0.5px] whitespace-nowrap"
-          style={{ color: "var(--accent-amber)" }}
-        >
-          CCBT <span style={{ color: "var(--text-dim)" }}>//</span>{" "}
-          CO {getCurrentSession()}
-        </Link>
-
-        {showSearch ? (
-          <div className="header-search">
-            <SearchBox basePath={basePath} />
-          </div>
-        ) : null}
-
-        <nav
-          className="header-nav flex items-center gap-4 text-[16px] uppercase tracking-[0.5px] whitespace-nowrap"
-          style={{ color: "var(--text-dim)" }}
-        >
+      <div className="header-inner flex w-full items-center gap-x-4 px-4 pt-3">
+        <div className="flex flex-col">
           <Link
-            href="/watchlist"
-            className="transition hover:text-[var(--text-secondary)]"
+            href="/"
+            className="text-[16px] font-medium uppercase tracking-[0.5px] whitespace-nowrap"
+            style={{ color: "var(--accent-amber)" }}
           >
-            ★ Watchlist
+            CCBT <span style={{ color: "var(--text-dim)" }}>//</span>{" "}
+            CO {getCurrentSession()}
           </Link>
-          <span>
+          <span
+            className="mt-0.5 text-[11px] uppercase tracking-[0.5px]"
+            style={{ color: "var(--text-dim)" }}
+          >
             {counts && isFiltering ? (
               <>
                 <span style={{ color: "var(--accent-amber)" }}>
@@ -72,23 +60,48 @@ export async function HeaderBar({
                 <span>{counts.total.toLocaleString()} bills</span>
                 {q ? (
                   <>
-                    <span style={{ color: "var(--text-dim)" }}> · </span>
+                    <span> · </span>
                     <span style={{ color: "var(--text-secondary)" }}>
                       &quot;{q}&quot;
                     </span>
                   </>
                 ) : null}
+                <span> · updated {formatLastUpdated(stats.lastUpdated)}</span>
               </>
             ) : (
               <>
-                {stats.total.toLocaleString()} bills tracked
-                <span style={{ color: "var(--text-dim)" }}> · </span>
-                updated {formatLastUpdated(stats.lastUpdated)}
+                {stats.total.toLocaleString()} bills · updated{" "}
+                {formatLastUpdated(stats.lastUpdated)}
               </>
             )}
           </span>
+        </div>
+
+        {showSearch ? (
+          <div className="header-search">
+            <SearchBox basePath={basePath} />
+          </div>
+        ) : null}
+
+        <nav
+          className="header-nav flex items-center gap-4 text-[14px] uppercase tracking-[0.5px] whitespace-nowrap"
+          style={{ color: "var(--text-dim)" }}
+        >
+          <Link
+            href="/sponsors"
+            className="transition hover:text-[var(--text-secondary)]"
+          >
+            👥 Sponsors
+          </Link>
+          <Link
+            href="/watchlist"
+            className="transition hover:text-[var(--text-secondary)]"
+          >
+            ★ Watchlist
+          </Link>
         </nav>
       </div>
+      <div className="px-4 pb-3" />
     </header>
   );
 }

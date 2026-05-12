@@ -11,6 +11,7 @@ type Sponsorship = {
   name?: string | null;
   classification?: string | null;
   person?: {
+    id?: string | null;
     party?: string | null;
     current_role?: {
       district?: string | number | null;
@@ -94,8 +95,33 @@ function buildBillId(session: string, billType: string, billNumber: number): str
   return `${JURISDICTION}-${session.toLowerCase()}-${billType.toLowerCase()}-${billNumber}`;
 }
 
-function pickPrimarySponsor(sponsorships: Sponsorship[] | null | undefined):
-  | { name: string | null; party: string | null; district: string | null }
+export function deriveSponsorIdFallback(
+  name: string | null,
+  district: string | null,
+): string | null {
+  if (!name) return null;
+  const noPrefix = name.replace(/^(rep\.|sen\.|del\.|res\.)\s*/i, "").trim();
+  const slug = noPrefix
+    .toLowerCase()
+    .replace(/,/g, " ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!slug) return null;
+  const districtSlug = district
+    ? district.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+    : null;
+  return districtSlug ? `slug:${slug}-${districtSlug}` : `slug:${slug}`;
+}
+
+export function pickPrimarySponsor(
+  sponsorships: Sponsorship[] | null | undefined,
+):
+  | {
+      id: string | null;
+      name: string | null;
+      party: string | null;
+      district: string | null;
+    }
   | null {
   if (!sponsorships || sponsorships.length === 0) return null;
   const primary =
@@ -109,8 +135,12 @@ function pickPrimarySponsor(sponsorships: Sponsorship[] | null | undefined):
       orgClass === "lower" ? "HD-" : orgClass === "upper" ? "SD-" : "";
     district = `${prefix}${role.district}`;
   }
+  const name = primary.name ?? null;
+  const personId = primary.person?.id ?? null;
+  const id = personId ?? deriveSponsorIdFallback(name, district);
   return {
-    name: primary.name ?? null,
+    id,
+    name,
     party: normalizeParty(primary.person?.party ?? null),
     district,
   };
@@ -205,9 +235,9 @@ const UPSERT_SQL = `
 INSERT INTO bills (
   id, jurisdiction, session, bill_type, bill_number, title,
   introduced_date, latest_action_date, latest_action_text,
-  sponsor_name, sponsor_party, sponsor_district,
+  sponsor_name, sponsor_party, sponsor_district, sponsor_id,
   update_date, openstates_id, raw_json, stage
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
   jurisdiction = excluded.jurisdiction,
   session = excluded.session,
@@ -220,6 +250,7 @@ ON CONFLICT(id) DO UPDATE SET
   sponsor_name = excluded.sponsor_name,
   sponsor_party = excluded.sponsor_party,
   sponsor_district = excluded.sponsor_district,
+  sponsor_id = excluded.sponsor_id,
   update_date = excluded.update_date,
   openstates_id = excluded.openstates_id,
   raw_json = excluded.raw_json,
@@ -254,6 +285,7 @@ async function upsertBill(
       sponsor?.name ?? null,
       sponsor?.party ?? null,
       sponsor?.district ?? null,
+      sponsor?.id ?? null,
       bill.updated_at,
       bill.id,
       JSON.stringify(bill),

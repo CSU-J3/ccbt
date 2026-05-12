@@ -69,10 +69,42 @@ export const TOPIC_LABELS: Record<string, string> = {
   other: "OTHR",
 };
 
+export const TOPIC_TITLES: Record<string, string> = {
+  healthcare: "Healthcare",
+  immigration: "Immigration",
+  taxes: "Taxes",
+  energy: "Energy",
+  environment: "Environment",
+  education: "Education",
+  labor: "Labor",
+  technology: "Technology",
+  civil_rights: "Civil rights",
+  criminal_justice: "Criminal justice",
+  agriculture: "Agriculture",
+  housing: "Housing",
+  transportation: "Transportation",
+  veterans: "Veterans",
+  elections: "Elections",
+  budget: "Budget",
+  financial_services: "Financial services",
+  government_operations: "Government operations",
+  consumer_protection: "Consumer protection",
+  public_safety: "Public safety",
+  licensing: "Licensing",
+  municipal_affairs: "Municipal affairs",
+  cannabis: "Cannabis",
+  water: "Water",
+  other: "Other",
+};
+
 export function topicColor(topic: string): string {
   return TOPIC_COLORS[topic] ?? TOPIC_COLORS.other!;
 }
 
 export function topicLabel(topic: string): string {
   return TOPIC_LABELS[topic] ?? topic.toUpperCase();
+}
+
+export function topicTitle(topic: string): string {
+  return TOPIC_TITLES[topic] ?? topic.replace(/_/g, " ");
 }

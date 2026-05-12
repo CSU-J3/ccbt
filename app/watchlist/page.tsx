@@ -1,16 +1,19 @@
 import { BillRow } from "@/components/BillRow";
-import { FooterLegend } from "@/components/FooterLegend";
+import { ChamberToggle } from "@/components/ChamberToggle";
+import { FeedLegend } from "@/components/FeedLegend";
 import { HeaderBar } from "@/components/HeaderBar";
 import { SortDropdown } from "@/components/SortDropdown";
 import {
   getWatchlistBills,
   isInWatchlist,
+  sanitizeChamber,
   sanitizeSort,
 } from "@/lib/queries";
 
 type SearchParams = {
   expanded?: string;
   sort?: string;
+  chamber?: string;
 };
 
 export default async function WatchlistPage({
@@ -19,13 +22,20 @@ export default async function WatchlistPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const expandedParam = typeof params.expanded === "string" ? params.expanded : undefined;
+  const expandedParam =
+    typeof params.expanded === "string" ? params.expanded : undefined;
   const sort = sanitizeSort(params.sort);
-  const bills = await getWatchlistBills(sort);
-  const expandedId = expandedParam && bills.some((b) => b.id === expandedParam)
-    ? expandedParam
-    : undefined;
+  const chamber = sanitizeChamber(params.chamber);
+  const bills = await getWatchlistBills(sort, chamber);
+  const expandedId =
+    expandedParam && bills.some((b) => b.id === expandedParam)
+      ? expandedParam
+      : undefined;
   const onWatchlist = expandedId ? await isInWatchlist(expandedId) : false;
+
+  const currentParams = new URLSearchParams();
+  if (sort && sort !== "action") currentParams.set("sort", sort);
+  if (chamber) currentParams.set("chamber", chamber);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -33,7 +43,7 @@ export default async function WatchlistPage({
 
       <main className="w-full flex-1 px-4 py-4">
         <div
-          className="mb-3 flex items-baseline gap-3 border-b pb-3 text-[12px] uppercase tracking-[0.5px]"
+          className="mb-3 flex flex-wrap items-baseline gap-3 border-b pb-3 text-[12px] uppercase tracking-[0.5px]"
           style={{
             borderColor: "var(--border-strong)",
             color: "var(--text-dim)",
@@ -41,12 +51,21 @@ export default async function WatchlistPage({
         >
           <span style={{ color: "var(--accent-amber)" }}>★ Watchlist</span>
           <span>·</span>
-          <span>{bills.length} {bills.length === 1 ? "bill" : "bills"}</span>
+          <span>
+            {bills.length} {bills.length === 1 ? "bill" : "bills"}
+          </span>
+          <ChamberToggle
+            current={chamber}
+            basePath="/watchlist"
+            currentParams={currentParams}
+          />
           <span className="ml-auto flex items-center gap-2">
             <span>Sort</span>
             <SortDropdown current={sort} basePath="/watchlist" />
           </span>
         </div>
+
+        <FeedLegend />
 
         {bills.length === 0 ? (
           <div
@@ -79,7 +98,7 @@ export default async function WatchlistPage({
                 <BillRow
                   key={b.id}
                   bill={b}
-                  filters={{ topics: [], stage: undefined, sort }}
+                  filters={{ topics: [], stage: undefined, sort, chamber }}
                   basePath="/watchlist"
                   expandedId={expandedId}
                   onWatchlist={expandedId === b.id ? onWatchlist : false}
@@ -90,8 +109,6 @@ export default async function WatchlistPage({
           </div>
         )}
       </main>
-
-      <FooterLegend />
     </div>
   );
 }
