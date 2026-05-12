@@ -130,35 +130,6 @@ export function validateResult(
   return { summary: parsed.summary, topics, stage };
 }
 
-function isOverloadError(err: unknown): boolean {
-  const msg = (err as { message?: string })?.message ?? "";
-  return /\b503\b|UNAVAILABLE|overloaded|high demand/i.test(msg);
-}
-
-async function generateWithRetry(
-  client: GoogleGenAI,
-  userPrompt: string,
-  attempt = 0,
-): ReturnType<GoogleGenAI["models"]["generateContent"]> {
-  try {
-    return await client.models.generateContent({
-      model: SUMMARY_MODEL,
-      contents: userPrompt,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    });
-  } catch (err) {
-    if (attempt < 3 && isOverloadError(err)) {
-      const wait = 5000 * 2 ** attempt;
-      await new Promise((r) => setTimeout(r, wait));
-      return generateWithRetry(client, userPrompt, attempt + 1);
-    }
-    throw err;
-  }
-}
-
 export async function summarizeBill(
   client: GoogleGenAI,
   bill: BillRow,
@@ -168,7 +139,14 @@ Bill title: ${bill.title}
 Latest action: ${bill.latest_action_text ?? "(none)"}
 Official abstract (if any): ${bill.abstract_text ?? ABSTRACT_FALLBACK}`;
 
-  const response = await generateWithRetry(client, userPrompt);
+  const response = await client.models.generateContent({
+    model: SUMMARY_MODEL,
+    contents: userPrompt,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
 
   const promptTokens = response.usageMetadata?.promptTokenCount ?? 0;
   const outputTokens = response.usageMetadata?.candidatesTokenCount ?? 0;

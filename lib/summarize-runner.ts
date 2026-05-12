@@ -9,9 +9,37 @@ import {
   type SummarizeResult,
 } from "./summarize";
 
-const BATCH_SIZE = 10;
-const BATCH_DELAY_MS = 1000;
+const THROTTLE_MS = 400;
+const RETRY_BACKOFFS_MS = [2000, 4000, 8000, 16000];
 const DEFAULT_LIMIT = 50;
+
+function isRetryable(err: unknown): boolean {
+  const msg = (err as { message?: string })?.message ?? "";
+  return /\b429\b|\b503\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|rate limit|quota/i.test(
+    msg,
+  );
+}
+
+async function withRetry<T>(fn: () => Promise<T>, billId: string): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryable(err) || attempt === RETRY_BACKOFFS_MS.length) {
+        throw err;
+      }
+      const wait = RETRY_BACKOFFS_MS[attempt];
+      const msg = (err as Error).message ?? "";
+      console.warn(
+        `retry ${billId} attempt ${attempt + 1}/${RETRY_BACKOFFS_MS.length}, wait ${wait}ms: ${msg.slice(0, 120)}`,
+      );
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+  throw lastErr;
+}
 
 export type SummarizeStats = {
   ok: number;
@@ -112,67 +140,59 @@ export async function runSummarize(
     else stats.abstractsFallback++;
   }
 
-  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-    const batch = candidates.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(
-      batch.map(async (c) => {
-        try {
-          const out = await summarizeBill(client, c.bill);
-          stats.promptTokens += out.promptTokens;
-          stats.outputTokens += out.outputTokens;
-          if (!out.result) {
-            console.warn(`parse-fail: ${c.bill.id}`);
-            return { c, result: null };
-          }
-          const rawStage = out.llmStageRaw;
-          if (rawStage && !ALLOWED_STAGES_SET.has(rawStage)) {
-            stats.unparseableLlmStages++;
-          } else if (
-            rawStage &&
-            c.deterministicStage &&
-            rawStage !== c.deterministicStage
-          ) {
-            stats.inEnumStageDivergences++;
-            console.warn(
-              `stage-disagree ${c.bill.id}: llm="${rawStage}" deterministic="${c.deterministicStage}"`,
-            );
-          }
-          await db.execute({
-            sql: `UPDATE bills
-                  SET summary = ?, summary_model = ?, summary_updated_at = ?, topics = ?
-                  WHERE id = ?`,
-            args: [
-              out.result.summary,
-              SUMMARY_MODEL,
-              new Date().toISOString(),
-              JSON.stringify(out.result.topics),
-              c.bill.id,
-            ],
-          });
-          console.log(
-            `summarized ${c.bill.id}: [${out.result.topics.join(",")}] / ${out.result.stage}`,
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i]!;
+    try {
+      const out = await withRetry(
+        () => summarizeBill(client, c.bill),
+        c.bill.id,
+      );
+      stats.promptTokens += out.promptTokens;
+      stats.outputTokens += out.outputTokens;
+      if (!out.result) {
+        console.warn(`parse-fail: ${c.bill.id}`);
+        stats.failed++;
+      } else {
+        const rawStage = out.llmStageRaw;
+        if (rawStage && !ALLOWED_STAGES_SET.has(rawStage)) {
+          stats.unparseableLlmStages++;
+        } else if (
+          rawStage &&
+          c.deterministicStage &&
+          rawStage !== c.deterministicStage
+        ) {
+          stats.inEnumStageDivergences++;
+          console.warn(
+            `stage-disagree ${c.bill.id}: llm="${rawStage}" deterministic="${c.deterministicStage}"`,
           );
-          return { c, result: out.result };
-        } catch (e) {
-          console.error(`error ${c.bill.id}:`, (e as Error).message);
-          return { c, result: null };
         }
-      }),
-    );
-
-    for (const r of results) {
-      if (r.result) {
+        await db.execute({
+          sql: `UPDATE bills
+                SET summary = ?, summary_model = ?, summary_updated_at = ?, topics = ?
+                WHERE id = ?`,
+          args: [
+            out.result.summary,
+            SUMMARY_MODEL,
+            new Date().toISOString(),
+            JSON.stringify(out.result.topics),
+            c.bill.id,
+          ],
+        });
+        console.log(
+          `summarized ${c.bill.id}: [${out.result.topics.join(",")}] / ${out.result.stage}`,
+        );
         stats.ok++;
         if (stats.samples.length < 5) {
-          stats.samples.push({ bill: r.c.bill, result: r.result });
+          stats.samples.push({ bill: c.bill, result: out.result });
         }
-      } else {
-        stats.failed++;
       }
+    } catch (e) {
+      console.error(`error ${c.bill.id}:`, (e as Error).message);
+      stats.failed++;
     }
 
-    if (i + BATCH_SIZE < candidates.length) {
-      await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+    if (i < candidates.length - 1) {
+      await new Promise((r) => setTimeout(r, THROTTLE_MS));
     }
   }
 
