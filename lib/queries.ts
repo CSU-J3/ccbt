@@ -1,5 +1,10 @@
 import { getDb } from "./db";
-import { ALLOWED_STAGES_SET, ALLOWED_TOPICS_SET } from "./enums";
+import {
+  ALLOWED_STAGES_SET,
+  ALLOWED_TOPICS_SET,
+  HOUSE_BILL_TYPES,
+  SENATE_BILL_TYPES,
+} from "./enums";
 
 const JURISDICTION = "co";
 
@@ -43,9 +48,6 @@ export const CHAMBER_KEYS = ["house", "senate"] as const;
 export type ChamberKey = (typeof CHAMBER_KEYS)[number];
 const CHAMBER_KEYS_SET = new Set<string>(CHAMBER_KEYS);
 
-const HOUSE_BILL_TYPES = ["HB", "HJR", "HCR", "HM"];
-const SENATE_BILL_TYPES = ["SB", "SJR", "SCR", "SM"];
-
 export type FeedFilters = {
   topics?: string[];
   stage?: string;
@@ -76,7 +78,7 @@ function buildFeedWhere(filters: FeedFilters): {
     const types =
       filters.chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
     const placeholders = types.map(() => "?").join(", ");
-    clauses.push(`UPPER(bill_type) IN (${placeholders})`);
+    clauses.push(`LOWER(bill_type) IN (${placeholders})`);
     for (const t of types) args.push(t);
   }
 
@@ -252,7 +254,7 @@ export async function getWatchlistBills(
   if (chamber) {
     const types = chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
     const placeholders = types.map(() => "?").join(", ");
-    chamberClause = ` AND UPPER(b.bill_type) IN (${placeholders})`;
+    chamberClause = ` AND LOWER(b.bill_type) IN (${placeholders})`;
     for (const t of types) args.push(t);
   }
 
@@ -333,7 +335,7 @@ export async function getSponsorAggregates(
   if (chamber) {
     const types = chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
     const placeholders = types.map(() => "?").join(", ");
-    clauses.push(`UPPER(bill_type) IN (${placeholders})`);
+    clauses.push(`LOWER(bill_type) IN (${placeholders})`);
     for (const t of types) args.push(t);
   }
 
@@ -399,7 +401,7 @@ export async function getSponsorDetail(
   if (chamber) {
     const types = chamber === "house" ? HOUSE_BILL_TYPES : SENATE_BILL_TYPES;
     const placeholders = types.map(() => "?").join(", ");
-    chamberClause = ` AND UPPER(bill_type) IN (${placeholders})`;
+    chamberClause = ` AND LOWER(bill_type) IN (${placeholders})`;
     for (const t of types) args.push(t);
   }
 

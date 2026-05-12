@@ -41,3 +41,10 @@ export const ALLOWED_STAGES = [
 
 export type Stage = (typeof ALLOWED_STAGES)[number];
 export const ALLOWED_STAGES_SET = new Set<string>(ALLOWED_STAGES);
+
+export const HOUSE_BILL_TYPES = ["hb", "hcr", "hjr", "hjm", "hm", "hr"] as const;
+export const SENATE_BILL_TYPES = ["sb", "scr", "sjr", "sjm", "sm", "sr"] as const;
+export const ALL_BILL_TYPES = [
+  ...HOUSE_BILL_TYPES,
+  ...SENATE_BILL_TYPES,
+] as const;

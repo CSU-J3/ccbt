@@ -84,7 +84,7 @@ CREATE TABLE bills (
   id TEXT PRIMARY KEY,              -- "co-2025a-hb-1234"
   jurisdiction TEXT NOT NULL,       -- "co" (future-proofs for multi-state)
   session TEXT NOT NULL,            -- "2025A"
-  bill_type TEXT NOT NULL,          -- "HB", "SB", "HJR", "SJR", "HCR", "SCR", "HM", "SM"
+  bill_type TEXT NOT NULL,          -- "HB", "SB", "HCR", "SCR", "HJR", "SJR", "HJM", "SJM", "HM", "SM", "HR", "SR"
   bill_number INTEGER NOT NULL,
   title TEXT NOT NULL,
   introduced_date TEXT,
@@ -234,7 +234,7 @@ Keep the acknowledgments section, swap "Congress.gov API" for "Plural Open / Ope
 ## Things to flag back to me
 
 - If the list endpoint with `include=actions` doesn't return enough action data to do stage inference, you'll need a per-bill detail fetch and the rate-limit math gets tighter. Tell me what you found.
-- If Colorado uses bill type abbreviations I didn't list above (`HB`, `SB`, `HJR`, `SJR`, `HCR`, `SCR`, `HM`, `SM`), add them and let me know.
+- If Colorado uses bill type abbreviations I didn't list above (`HB`, `SB`, `HCR`, `SCR`, `HJR`, `SJR`, `HJM`, `SJM`, `HM`, `SM`, `HR`, `SR`), add them and let me know.
 - If the current session identifier from OpenStates doesn't match the `2025A` shape I assumed, use whatever they actually return and update the env var default.
 
 Don't add new dependencies, don't touch the UI yet, don't write the summarization logic. Get sync working, prove the schema, hand back.
