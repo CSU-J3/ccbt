@@ -1,8 +1,66 @@
 import { createClient, type Client } from "@libsql/client";
 
+// Bound EVERY Turso HTTP request with a per-request timeout + abort + retry-once.
+// Ported from CBT HO 238: a bare createClient({url,authToken}) has no timeout and
+// no abort signal, so a single stalled HTTP request (a dead or never-established
+// connection that nothing ever gives up on) rides to the full function ceiling
+// instead of failing fast. The bound is a custom `fetch` injected into the libsql
+// HTTP client, so it covers every caller (pages, API routes, crons, scripts) from
+// one place.
+const DB_REQUEST_TIMEOUT_MS = 10_000;
+
+// AbortSignal.timeout aborts with a DOMException named "TimeoutError"; a manual
+// abort would be "AbortError". Only these mean "we gave up on a stalled socket"
+// — an HTTP error status is a real answer and is never retried.
+function isAbortTimeout(e: unknown): boolean {
+  return (
+    e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
+  );
+}
+
+// Custom fetch for the libsql HTTP client (Config.fetch — supported since well
+// before 0.14; installed client is 0.14.0). Handed a Request, returns a
+// Response-compatible promise.
+//
+// ABORT, not race: AbortSignal.timeout tears the underlying socket down, which
+// is both the timeout (we stop waiting) and what makes the retry valid — it
+// can't reuse the corpse, so attempt 2 gets a fresh connection by construction.
+// A Promise.race "timeout" would leave the hung fetch alive holding the dead
+// socket, defeating both.
+//
+// Retry: ONCE, on abort/timeout only. The Request is cloned up front so the
+// retry has an unconsumed body; if it can't be cloned we fast-fail instead
+// (still bounded, just no retry). CCBT writes are all upsert/UPDATE/DELETE-shaped
+// (bills ON CONFLICT DO UPDATE, bills UPDATE, watchlist DELETE), so a retried-
+// after-timeout write is idempotent.
+async function boundedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const cloneable =
+    input != null && typeof (input as Request).clone === "function";
+  const retryInput = cloneable ? (input as Request).clone() : null;
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS),
+    });
+  } catch (e) {
+    if (isAbortTimeout(e) && retryInput) {
+      console.warn("[db] timeout, retrying");
+      return await fetch(retryInput, {
+        ...init,
+        signal: AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS),
+      });
+    }
+    if (isAbortTimeout(e)) console.warn("[db] timeout (no retry — uncloneable)");
+    throw e;
+  }
+}
+
 export function getDb(): Client {
   const url = process.env.TURSO_DATABASE_URL;
   const authToken = process.env.TURSO_AUTH_TOKEN;
   if (!url) throw new Error("TURSO_DATABASE_URL is not set");
-  return createClient({ url, authToken });
+  return createClient({ url, authToken, fetch: boundedFetch });
 }
